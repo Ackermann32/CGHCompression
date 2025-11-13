@@ -93,7 +93,7 @@ def calculate_ramanujan_sums(rows_lenght, column_lenght):
     
     return ramanujan_sums_row, ramanujan_sums_column
 
-def compress_with_fpzip(matrix,output_file,split):
+def compress_with_fpzip(matrix,output_file,split=True):
 
     if split and np.iscomplexobj(matrix):
         real_data = np.ascontiguousarray(np.real(matrix), dtype=np.float64)
@@ -107,19 +107,24 @@ def compress_with_fpzip(matrix,output_file,split):
             f.write(compressed_real)
             f.write(compressed_imag)    
     
-    ''' TODO implementare eventualmente la compressione senza split di parte reale e immaginaria per confrontare
     else:
-        data = np.ascontiguousarray(matrix, dtype=np.float64)
+        #Reinterpreto la matrice complessa come una matrice di float64, senza perdere informazione
+        float_view = matrix.view(np.float64)
+        float_view = np.ascontiguousarray(float_view)
+
         with open(output_file, 'wb') as f:
-            compressed = fpzip.compress(data)
+            compressed = fpzip.compress(float_view)
             f.write(compressed)
-    '''
+
 
 def calculate_Y(X):
-
-    F_N, F_M = calculate_ramanujan_sums(1080, 1920)
-
-    save_ramanujan_sums(F_N,F_M)
+    F_N_output_file = os.path.join(os.path.dirname(__file__),'ramanujan_data', 'F_N.npy')
+    F_M_output_file = os.path.join(os.path.dirname(__file__),'ramanujan_data', 'F_M.npy')
+    if(os.path.exists(F_N_output_file) and os.path.exists(F_M_output_file)):
+        F_N,F_M = load_ramanujan_sums()
+    else:   
+        F_N,F_M = calculate_ramanujan_sums(1080,1920)
+        save_ramanujan_sums(F_N,F_M)
 
     F_N_inv = np.linalg.inv(F_N)
     F_M_inv = np.linalg.inv(F_M)
@@ -128,9 +133,7 @@ def calculate_Y(X):
 
     return Y   
 
-def save_ramanujan_sums(F_N,F_M):
-    F_N_output_file = os.path.join(os.path.dirname(__file__),'ramanujan_data', 'F_N.npy')
-    F_M_output_file = os.path.join(os.path.dirname(__file__),'ramanujan_data', 'F_M.npy')
+def save_ramanujan_sums(F_N, F_M, F_N_output_file, F_M_output_file):
 
     with open(F_N_output_file, 'wb') as f:
         np.save(f,F_N)
@@ -146,20 +149,30 @@ def load_ramanujan_sums():
 
     return F_N,F_M
 
-def decompress_with_fpzip(output_file):
+def decompress_with_fpzip(output_file,split=True):
     with open(output_file, 'rb') as f:
-        len_real = np.frombuffer(f.read(8), dtype=np.int64)[0]
-        len_imag = np.frombuffer(f.read(8), dtype=np.int64)[0]
 
-        compressed_real = f.read(len_real)
-        compressed_imaginary = f.read(len_imag)
+        if(split):
+            len_real = np.frombuffer(f.read(8), dtype=np.int64)[0]
+            len_imag = np.frombuffer(f.read(8), dtype=np.int64)[0]
 
-        uncompressed_real = fpzip.decompress(compressed_real).squeeze()
-        uncompressed_imaginary = fpzip.decompress(compressed_imaginary).squeeze()
+            compressed_real = f.read(len_real)
+            compressed_imaginary = f.read(len_imag)
 
-        #ricostruisco la matrice complessa
-        Y = uncompressed_real + 1j * uncompressed_imaginary
-        return Y
+            uncompressed_real = fpzip.decompress(compressed_real).squeeze()
+            uncompressed_imaginary = fpzip.decompress(compressed_imaginary).squeeze()
+
+            #ricostruisco la matrice complessa
+            Y = uncompressed_real + 1j * uncompressed_imaginary
+            return Y
+        else:
+            data = f.read()
+            float_array = fpzip.decompress(data)
+            float_array = float_array.reshape(1080, 1920, 2)
+
+            # ricostruzione dei complessi
+            complex_matrix = float_array[...,0] + 1j * float_array[...,1]
+            return complex_matrix
 
 def calculate_X(Y):
     F_N , F_M = load_ramanujan_sums()
@@ -172,10 +185,19 @@ def main():
     X = data["Hol"]
 
     Y = calculate_Y(X)
-    output_file = os.path.join(os.path.dirname(__file__), 'out', f'{ORIGINAL_CGH_FILENAME}_compressed.fpzip')  
-    compress_with_fpzip(Y, output_file, split=True)
+    split = True
+    output_file = os.path.join(os.path.dirname(__file__), 'out', f'{ORIGINAL_CGH_FILENAME}_compressed{'_unsplitted' if split == False else ''}.fpzip')  
+    compress_with_fpzip(Y, output_file, split)
 
-    Y = decompress_with_fpzip(output_file)
+    # Risulta essere più efficiente la compressione separando parte reale e immaginaria
+    # split = False
+    # output_file = os.path.join(os.path.dirname(__file__), 'out', f'{ORIGINAL_CGH_FILENAME}_compressed{'_unsplitted' if split == False else ''}.fpzip')  
+    # compress_with_fpzip(Y, output_file, split)
+
+    # print('Size splitted:',os.path.getsize(os.path.join(os.path.dirname(__file__), 'out', f'{ORIGINAL_CGH_FILENAME}_compressed.fpzip')  ))
+    # print('Size unsplitted:',os.path.getsize(os.path.join(os.path.dirname(__file__), 'out', f'{ORIGINAL_CGH_FILENAME}_compressed_unsplitted.fpzip')  ))
+
+    Y = decompress_with_fpzip(output_file,split)
 
     decompressed_X = calculate_X(Y)
     decompressed_filepath_mat = os.path.join(os.path.dirname(__file__), 'decompressed', f'{ORIGINAL_CGH_FILENAME}_decompressed.mat')

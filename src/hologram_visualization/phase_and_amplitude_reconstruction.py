@@ -14,9 +14,6 @@ def load_hologram_with_metadata(filepath):
     metadata['pixel_pitch'] = data.get('pitch')
     metadata['wavelength'] = data.get('wlen')
     metadata['distance'] = data.get('zobj')
-    
-    print(hologram)
-    print(metadata)
 
     return hologram, metadata
 
