@@ -4,8 +4,6 @@ from scipy.io import loadmat
 from scipy.fft import fft2, ifft2, fftshift, ifftshift
 import os
 
-ORIGINAL_CGH_FILENAME = 'Hol_2D_dice.mat'
-
 def load_hologram_with_metadata(filepath):
     """Carica l'ologramma e i metadati dal file .mat"""
     data = loadmat(filepath)
@@ -17,6 +15,9 @@ def load_hologram_with_metadata(filepath):
     metadata['wavelength'] = data.get('wlen')
     metadata['distance'] = data.get('zobj')
     
+    print(hologram)
+    print(metadata)
+
     return hologram, metadata
 
 def reconstruct_with_angular_spectrum(hologram, pixel_pitch, wavelength, distance):
@@ -116,11 +117,8 @@ def display_reconstruction(hologram, reconstructed_field, metadata):
     plt.tight_layout()
     plt.show()
 
-# Esempio di utilizzo
-if __name__ == "__main__":
-    
-    filepath = os.path.join(os.path.dirname(__file__),'..', 'dataset', ORIGINAL_CGH_FILENAME)
-    
+def show_phase_and_amplitude(filepath): 
+
     # PARAMETRI DI DEFAULT (da modificare se non trovati nel file)
     default_params = {
         'pixel_pitch': 3.45e-6,  # 3.45 μm (tipico per sensori CCD/CMOS)
@@ -170,3 +168,7 @@ if __name__ == "__main__":
         print(f"❌ Errore: {e}")
         import traceback
         traceback.print_exc()
+
+# Esempio di utilizzo
+if __name__ == "__main__":
+    show_phase_and_amplitude(os.path.join(os.path.dirname(__file__),'..', 'dataset', 'Hol_2D_dice.mat'))

@@ -1,20 +1,16 @@
-from HoloUtils import getComplex, hologramReconstruction
+from .HoloUtils import getComplex, hologramReconstruction
 from scipy.io import loadmat
 import numpy as np
 import os
 
-ORIGINAL_CGH_FILENAME = 'Hol_2D_dice.mat'
+def show_hologram_reconstruction(filepath):
 
-if __name__ == "__main__":
-
-    filepath = os.path.join(os.path.dirname(__file__),'..', 'dataset', ORIGINAL_CGH_FILENAME)
     data = loadmat(filepath)
-    print(data)
 
     hologram = data['Hol']
-    pitch = data['pitch']
+    pitch = data.get('pitch',8.e-06)
     zobj = data.get('zobj',0.9)
-    wlen = data['wlen']
+    wlen = data.get('wlen', 6.33e-07)
 
     #Effettuo un crop da 1920*1080 a 1080*1080 perché l'algoritmo per la visualizzazione dell'ologramma richiede una matrice quadrata
     hologram = hologram[:, 420:]
@@ -24,5 +20,7 @@ if __name__ == "__main__":
     realMatrix = np.real(hologram)
 
     complexMatrix = getComplex(realMatrix,imagMatrix)
+    hologramReconstruction(complexMatrix, pitch, zobj, wlen)
 
-    hologramReconstruction(complexMatrix, pitch, 0.9, wlen)
+if __name__ == "__main__":
+    show_hologram_reconstruction(os.path.join(os.path.dirname(__file__),'..', 'dataset', 'Hol_2D_dice.mat'))

@@ -1,10 +1,14 @@
 from scipy.io import loadmat
+from scipy.io import savemat
 import math
 import numpy as np
 import os
 import fpzip
+from utils import paper_similarity
+from hologram_visualization.hologram_reconstruction import *
+from hologram_visualization.phase_and_amplitude_reconstruction import *
 
-ORIGINAL_CGH_FILENAME = 'Hol_2D_dice.mat'
+ORIGINAL_CGH_FILENAME = 'Hol_2D_dice'
 
 def isPrime(n) :
 
@@ -61,8 +65,8 @@ def ramanujan_sum_for_dimension(dimension):
     
 
 
-
-def ramanujan_sums(rows_lenght, column_lenght):
+#TODO ottimizzare 
+def calculate_ramanujan_sums(rows_lenght, column_lenght):
 
     ramanujan_sums_row = np.zeros((rows_lenght, rows_lenght))
     ramanujan_sums_column = np.zeros((column_lenght,column_lenght))
@@ -97,8 +101,11 @@ def compress_with_fpzip(matrix,output_file,split):
         with open(output_file , 'wb') as f:
             compressed_real = fpzip.compress(real_data)
             compressed_imag = fpzip.compress(imag_data)
+            #Salvo la lunghezza 
+            f.write(np.array([len(compressed_real)], dtype=np.int64).tobytes())
+            f.write(np.array([len(compressed_imag)], dtype=np.int64).tobytes())
             f.write(compressed_real)
-            f.write(compressed_imag)
+            f.write(compressed_imag)    
     
     ''' TODO implementare eventualmente la compressione senza split di parte reale e immaginaria per confrontare
     else:
@@ -107,21 +114,84 @@ def compress_with_fpzip(matrix,output_file,split):
             compressed = fpzip.compress(data)
             f.write(compressed)
     '''
-def main():
-    file_mat = os.path.join(os.path.dirname(__file__), 'dataset', ORIGINAL_CGH_FILENAME)
-    data = loadmat(file_mat)
-    X = data["Hol"]
 
-    F_N, F_M = ramanujan_sums(1080, 1920)
+def calculate_Y(X):
+
+    F_N, F_M = calculate_ramanujan_sums(1080, 1920)
+
+    save_ramanujan_sums(F_N,F_M)
 
     F_N_inv = np.linalg.inv(F_N)
     F_M_inv = np.linalg.inv(F_M)
 
-    Y = F_N_inv @ X @ F_M_inv.T     
+    Y = F_N_inv @ X @ F_M_inv.T 
 
-    output_file = os.path.join(os.path.dirname(__file__), 'out', f'{ORIGINAL_CGH_FILENAME}_compressed.fpzip')
-    
+    return Y   
+
+def save_ramanujan_sums(F_N,F_M):
+    F_N_output_file = os.path.join(os.path.dirname(__file__),'ramanujan_data', 'F_N.npy')
+    F_M_output_file = os.path.join(os.path.dirname(__file__),'ramanujan_data', 'F_M.npy')
+
+    with open(F_N_output_file, 'wb') as f:
+        np.save(f,F_N)
+
+    with open(F_M_output_file, 'wb') as f:
+        np.save(f,F_M)
+
+def load_ramanujan_sums():
+    F_N_output_file = os.path.join(os.path.dirname(__file__),'ramanujan_data', 'F_N.npy')
+    F_M_output_file = os.path.join(os.path.dirname(__file__),'ramanujan_data', 'F_M.npy')
+    F_N = np.load(F_N_output_file)
+    F_M = np.load(F_M_output_file)
+
+    return F_N,F_M
+
+def decompress_with_fpzip(output_file):
+    with open(output_file, 'rb') as f:
+        len_real = np.frombuffer(f.read(8), dtype=np.int64)[0]
+        len_imag = np.frombuffer(f.read(8), dtype=np.int64)[0]
+
+        compressed_real = f.read(len_real)
+        compressed_imaginary = f.read(len_imag)
+
+        uncompressed_real = fpzip.decompress(compressed_real).squeeze()
+        uncompressed_imaginary = fpzip.decompress(compressed_imaginary).squeeze()
+
+        #ricostruisco la matrice complessa
+        Y = uncompressed_real + 1j * uncompressed_imaginary
+        return Y
+
+def calculate_X(Y):
+    F_N , F_M = load_ramanujan_sums()
+    X = F_N @ Y @ F_M.T
+    return X
+
+def main():
+    filepath_mat = os.path.join(os.path.dirname(__file__), 'dataset', f'{ORIGINAL_CGH_FILENAME}.mat')
+    data = loadmat(filepath_mat)
+    X = data["Hol"]
+
+    Y = calculate_Y(X)
+    output_file = os.path.join(os.path.dirname(__file__), 'out', f'{ORIGINAL_CGH_FILENAME}_compressed.fpzip')  
     compress_with_fpzip(Y, output_file, split=True)
+
+    Y = decompress_with_fpzip(output_file)
+
+    decompressed_X = calculate_X(Y)
+    decompressed_filepath_mat = os.path.join(os.path.dirname(__file__), 'decompressed', f'{ORIGINAL_CGH_FILENAME}_decompressed.mat')
+    savemat(decompressed_filepath_mat, {"Hol": decompressed_X})
+
+    similarity_manager = paper_similarity.Similarity(paper_similarity.GammaM.bump, paper_similarity.GammaR.cos,
+                                             paper_similarity.GammaA.unique)
+
+    similarity = similarity_manager.calc_similarity(X,decompressed_X)
+    print('Similarity = ',similarity)
+
+    show_hologram_reconstruction(filepath_mat)
+    show_hologram_reconstruction(decompressed_filepath_mat)
+
+    show_phase_and_amplitude(filepath_mat)
+    show_phase_and_amplitude(decompressed_filepath_mat)
 
 if __name__ == '__main__':
     main()

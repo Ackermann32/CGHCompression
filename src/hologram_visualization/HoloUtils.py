@@ -317,13 +317,16 @@ def fourierFresnel1D(x, pp, z, wlen, forward):
         Returns:
             ndarray: The Fourier-Fresnel Transform of the input array.
         """
+    x = np.asarray(x)
+
     c = 1j * np.pi / wlen / z  # c valore corretto
     if not forward:
         c = -c
     n = np.size(x, 0)
     ppout = wlen * np.abs(z) / n / pp
-    w = np.matrix(np.arange(-n / 2, n / 2)).getH()
-    e = np.exp(c[0, 0] * (np.power((w * pp), 2)))
+    w = np.arange(-n/2, n/2).reshape(-1, 1)
+
+    e = np.exp(c * (np.power((w * pp), 2)))
 
     if forward:
         x = np.fft.fftshift(np.multiply(x, e), 0)

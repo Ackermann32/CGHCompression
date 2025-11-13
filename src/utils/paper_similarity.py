@@ -5,6 +5,8 @@ from typing import Callable
 
 import numpy as np
 
+import multiprocessing
+
 DELTA = 0.5
 HEAVISIDE_PARAM = 0.5
 
