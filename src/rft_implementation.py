@@ -118,8 +118,8 @@ def compress_with_fpzip(matrix,output_file,split=True):
 
 
 def calculate_Y(X):
-    F_N_output_file = os.path.join(os.path.dirname(__file__),'ramanujan_data', 'F_N.npy')
-    F_M_output_file = os.path.join(os.path.dirname(__file__),'ramanujan_data', 'F_M.npy')
+    F_N_output_file = os.path.join(os.path.dirname(__file__),'..','ramanujan_data', 'F_N.npy')
+    F_M_output_file = os.path.join(os.path.dirname(__file__),'..','ramanujan_data', 'F_M.npy')
     if(os.path.exists(F_N_output_file) and os.path.exists(F_M_output_file)):
         F_N,F_M = load_ramanujan_sums()
     else:   
@@ -142,8 +142,8 @@ def save_ramanujan_sums(F_N, F_M, F_N_output_file, F_M_output_file):
         np.save(f,F_M)
 
 def load_ramanujan_sums():
-    F_N_output_file = os.path.join(os.path.dirname(__file__),'ramanujan_data', 'F_N.npy')
-    F_M_output_file = os.path.join(os.path.dirname(__file__),'ramanujan_data', 'F_M.npy')
+    F_N_output_file = os.path.join(os.path.dirname(__file__),'..','ramanujan_data', 'F_N.npy')
+    F_M_output_file = os.path.join(os.path.dirname(__file__),'..','ramanujan_data', 'F_M.npy')
     F_N = np.load(F_N_output_file)
     F_M = np.load(F_M_output_file)
 
@@ -180,13 +180,13 @@ def calculate_X(Y):
     return X
 
 def main():
-    filepath_mat = os.path.join(os.path.dirname(__file__), 'dataset', f'{ORIGINAL_CGH_FILENAME}.mat')
+    filepath_mat = os.path.join(os.path.dirname(__file__),'..', 'dataset', f'{ORIGINAL_CGH_FILENAME}.mat')
     data = loadmat(filepath_mat)
     X = data["Hol"]
 
     Y = calculate_Y(X)
     split = True
-    output_file = os.path.join(os.path.dirname(__file__), 'out', f'{ORIGINAL_CGH_FILENAME}_compressed{'_unsplitted' if split == False else ''}.fpzip')  
+    output_file = os.path.join(os.path.dirname(__file__),'..', 'out', f'{ORIGINAL_CGH_FILENAME}_compressed{'_unsplitted' if split == False else ''}.fpzip')  
     compress_with_fpzip(Y, output_file, split)
 
     # Risulta essere più efficiente la compressione separando parte reale e immaginaria
@@ -200,7 +200,7 @@ def main():
     Y = decompress_with_fpzip(output_file,split)
 
     decompressed_X = calculate_X(Y)
-    decompressed_filepath_mat = os.path.join(os.path.dirname(__file__), 'decompressed', f'{ORIGINAL_CGH_FILENAME}_decompressed.mat')
+    decompressed_filepath_mat = os.path.join(os.path.dirname(__file__),'..', 'decompressed', f'{ORIGINAL_CGH_FILENAME}_decompressed.mat')
     savemat(decompressed_filepath_mat, {"Hol": decompressed_X})
 
     similarity_manager = paper_similarity.Similarity(paper_similarity.GammaM.bump, paper_similarity.GammaR.cos,
