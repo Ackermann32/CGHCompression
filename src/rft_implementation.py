@@ -9,6 +9,8 @@ from hologram_visualization.hologram_reconstruction import *
 from hologram_visualization.phase_and_amplitude_reconstruction import *
 import json
 from utils.hologram import Hologram
+import pickle
+import utils.utils as utils
 
 ORIGINAL_CGH_FILENAME = 'Hol_2D_dice'
 
@@ -207,7 +209,6 @@ def main():
     hologram_data = Hologram.open_hologram_file(filepath_mat)
 
     X = hologram_data.hol
-
     Y = calculate_Y(X)
     split = True
     output_file = os.path.join(os.path.dirname(__file__),'..', 'out', f'{ORIGINAL_CGH_FILENAME}_compressed{'_unsplitted' if split == False else ''}.fpzip')  
@@ -222,9 +223,7 @@ def main():
     # print('Size unsplitted:',os.path.getsize(os.path.join(os.path.dirname(__file__), 'out', f'{ORIGINAL_CGH_FILENAME}_compressed_unsplitted.fpzip')  ))
 
     decompressed_hologram_data = decompress_with_fpzip(output_file)
-
     decompressed_hologram_data.hol = calculate_X(decompressed_hologram_data.hol)
-
     decompressed_X = decompressed_hologram_data.hol
 
     similarity_manager = paper_similarity.Similarity(paper_similarity.GammaM.bump, paper_similarity.GammaR.cos,
@@ -232,6 +231,13 @@ def main():
 
     similarity = similarity_manager.calc_similarity(X,decompressed_X)
     print('Similarity = ',similarity)
+
+    #Salvo ologramma in formato .raw per calcolare il tasso di compressione
+    path_raw = os.path.join(os.path.dirname(__file__),'hologram.raw')
+    with open(path_raw, "wb") as fp:
+        pickle.dump(hologram_data, fp)
+    print("compression rate =", utils.calculate_compression_rate(output_file, path_raw))
+    os.remove(path_raw)
 
     show_hologram_reconstruction(hologram_data)
     show_hologram_reconstruction(decompressed_hologram_data)
