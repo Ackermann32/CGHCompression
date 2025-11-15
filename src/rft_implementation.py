@@ -181,8 +181,10 @@ def calculate_X(Y):
 
 def main():
     filepath_mat = os.path.join(os.path.dirname(__file__),'..', 'dataset', f'{ORIGINAL_CGH_FILENAME}.mat')
-    data = loadmat(filepath_mat)
-    X = data["Hol"]
+
+    hologram_data = Hologram.open_hologram_file(filepath_mat)
+
+    X = hologram_data.hol
 
     Y = calculate_Y(X)
     split = True
@@ -209,11 +211,13 @@ def main():
     similarity = similarity_manager.calc_similarity(X,decompressed_X)
     print('Similarity = ',similarity)
 
-    show_hologram_reconstruction(filepath_mat)
-    show_hologram_reconstruction(decompressed_filepath_mat)
+    decompressed_hologram_data = Hologram.open_hologram_file(decompressed_filepath_mat)
 
-    show_phase_and_amplitude(filepath_mat)
-    show_phase_and_amplitude(decompressed_filepath_mat)
+    show_hologram_reconstruction(hologram_data)
+    show_hologram_reconstruction(decompressed_hologram_data)
+
+    show_phase_and_amplitude(hologram_data)
+    show_phase_and_amplitude(decompressed_hologram_data)
 
 if __name__ == '__main__':
     main()

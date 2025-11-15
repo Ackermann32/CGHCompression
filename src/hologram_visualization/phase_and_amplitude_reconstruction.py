@@ -3,19 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.io import loadmat
 from scipy.fft import fft2, ifft2, fftshift, ifftshift
 import os
-
-def load_hologram_with_metadata(filepath):
-    """Carica l'ologramma e i metadati dal file .mat"""
-    data = loadmat(filepath)
-      
-    hologram = data['Hol'] 
-    # Cerca i metadati comuni
-    metadata = {}
-    metadata['pixel_pitch'] = data.get('pitch')
-    metadata['wavelength'] = data.get('wlen')
-    metadata['distance'] = data.get('zobj')
-
-    return hologram, metadata
+from utils.hologram import Hologram
 
 def reconstruct_with_angular_spectrum(hologram, pixel_pitch, wavelength, distance):
     """
@@ -114,53 +102,27 @@ def display_reconstruction(hologram, reconstructed_field, metadata):
     plt.tight_layout()
     plt.show()
 
-def show_phase_and_amplitude(filepath): 
+def show_phase_and_amplitude(hologram:Hologram): 
 
-    # PARAMETRI DI DEFAULT (da modificare se non trovati nel file)
-    default_params = {
-        'pixel_pitch': 3.45e-6,  # 3.45 μm (tipico per sensori CCD/CMOS)
-        'wavelength': 632.8e-9,   # 632.8 nm (laser HeNe rosso)
-        'distance': 0.05          # 50 mm
-    }
     
-    try:
-        # Carica ologramma e metadati
-        hologram, metadata = load_hologram_with_metadata(filepath)
-        
-        # Richiedi parametri mancanti
-        pixel_pitch = metadata.get('pixel_pitch') or metadata.get('pixelPitch') or metadata.get('dx')
-        if pixel_pitch is None:
-            pixel_pitch = default_params['pixel_pitch']
-            print(f"⚠ pixel_pitch non trovato, usando default: {pixel_pitch*1e6:.2f} μm")
-        
-        wavelength = metadata.get('wavelength') or metadata.get('lambda') or metadata.get('wvl')
-        if wavelength is None:
-            wavelength = default_params['wavelength']
-            print(f"⚠ wavelength non trovata, usando default: {wavelength*1e9:.2f} nm")
-        
-        distance = metadata.get('distance') or metadata.get('z') or metadata.get('z0')
-        if distance is None:
-            distance = default_params['distance']
-            print(f"⚠ distance non trovata, usando default: {distance*1e3:.2f} mm")
-        
+    try:    
+        # Richiedi parametri mancanti      
         metadata_used = {
-            'pixel_pitch': pixel_pitch,
-            'wavelength': wavelength,
-            'distance': distance
+            'pixel_pitch': hologram.pp,
+            'wavelength': hologram.wlen,
+            'distance': hologram.zobj
         }
         
         print("\nRicostruzione in corso...")
         
         # Ricostruisci con Angular Spectrum
         reconstructed = reconstruct_with_angular_spectrum(
-            hologram, pixel_pitch, wavelength, distance
+            hologram.hol, hologram.pp, hologram.wlen, hologram.zobj
         )
         
         # Visualizza risultati
-        display_reconstruction(hologram, reconstructed, metadata_used)
-        
-    except FileNotFoundError:
-        print(f"❌ File non trovato: {filepath}")
+        display_reconstruction(hologram.hol, reconstructed, metadata_used)
+
     except Exception as e:
         print(f"❌ Errore: {e}")
         import traceback
