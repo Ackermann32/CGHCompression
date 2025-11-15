@@ -7,6 +7,8 @@ import fpzip
 from utils import paper_similarity
 from hologram_visualization.hologram_reconstruction import *
 from hologram_visualization.phase_and_amplitude_reconstruction import *
+import json
+from utils.hologram import Hologram
 
 ORIGINAL_CGH_FILENAME = 'Hol_2D_dice'
 
@@ -93,26 +95,41 @@ def calculate_ramanujan_sums(rows_lenght, column_lenght):
     
     return ramanujan_sums_row, ramanujan_sums_column
 
-def compress_with_fpzip(matrix,output_file,split=True):
+def compress_with_fpzip(hologram:Hologram,output_file,split=True):
 
-    if split and np.iscomplexobj(matrix):
-        real_data = np.ascontiguousarray(np.real(matrix), dtype=np.float64)
-        imag_data = np.ascontiguousarray(np.imag(matrix), dtype=np.float64)
-        with open(output_file , 'wb') as f:
+    metadata = {}
+    metadata["pp"]   = float(np.asarray(hologram.pp).squeeze()) #Non so perchè non li vede come scalari
+    metadata["zobj"] = float(np.asarray(hologram.zobj).squeeze())
+    metadata["wlen"] = float(np.asarray(hologram.wlen).squeeze())
+    metadata["isSplitted"] = split
+
+    header_bytes = json.dumps(metadata).encode("utf-8")
+    header_len = np.int64(len(header_bytes)).tobytes()
+
+    with open(output_file , 'wb') as f:
+
+        f.write(header_len)
+        f.write(header_bytes)
+
+        matrix = hologram.hol
+
+        if split and np.iscomplexobj(matrix):
+            real_data = np.ascontiguousarray(np.real(matrix), dtype=np.float64)
+            imag_data = np.ascontiguousarray(np.imag(matrix), dtype=np.float64)
+            
             compressed_real = fpzip.compress(real_data)
             compressed_imag = fpzip.compress(imag_data)
             #Salvo la lunghezza 
-            f.write(np.array([len(compressed_real)], dtype=np.int64).tobytes())
-            f.write(np.array([len(compressed_imag)], dtype=np.int64).tobytes())
+            f.write(np.int64(len(compressed_real)).tobytes())
+            f.write(np.int64(len(compressed_imag)).tobytes())
             f.write(compressed_real)
             f.write(compressed_imag)    
-    
-    else:
-        #Reinterpreto la matrice complessa come una matrice di float64, senza perdere informazione
-        float_view = matrix.view(np.float64)
-        float_view = np.ascontiguousarray(float_view)
+        
+        else:
+            #Reinterpreto la matrice complessa come una matrice di float64, senza perdere informazione
+            float_view = matrix.view(np.float64)
+            float_view = np.ascontiguousarray(float_view)
 
-        with open(output_file, 'wb') as f:
             compressed = fpzip.compress(float_view)
             f.write(compressed)
 
@@ -149,8 +166,13 @@ def load_ramanujan_sums():
 
     return F_N,F_M
 
-def decompress_with_fpzip(output_file,split=True):
+def decompress_with_fpzip(output_file):
     with open(output_file, 'rb') as f:
+
+        header_len = np.frombuffer(f.read(8), dtype=np.int64)[0]
+        header_bytes = f.read(header_len)
+        metadata = json.loads(header_bytes.decode("utf-8"))
+        split = metadata["isSplitted"]
 
         if(split):
             len_real = np.frombuffer(f.read(8), dtype=np.int64)[0]
@@ -164,7 +186,7 @@ def decompress_with_fpzip(output_file,split=True):
 
             #ricostruisco la matrice complessa
             Y = uncompressed_real + 1j * uncompressed_imaginary
-            return Y
+            return Hologram(Y, metadata["pp"], metadata["zobj"], metadata["wlen"])
         else:
             data = f.read()
             float_array = fpzip.decompress(data)
@@ -172,7 +194,7 @@ def decompress_with_fpzip(output_file,split=True):
 
             # ricostruzione dei complessi
             complex_matrix = float_array[...,0] + 1j * float_array[...,1]
-            return complex_matrix
+            return Hologram(complex_matrix, metadata["pp"], metadata["zobj"], metadata["wlen"])
 
 def calculate_X(Y):
     F_N , F_M = load_ramanujan_sums()
@@ -189,7 +211,7 @@ def main():
     Y = calculate_Y(X)
     split = True
     output_file = os.path.join(os.path.dirname(__file__),'..', 'out', f'{ORIGINAL_CGH_FILENAME}_compressed{'_unsplitted' if split == False else ''}.fpzip')  
-    compress_with_fpzip(Y, output_file, split)
+    compress_with_fpzip(Hologram(Y,hologram_data.pp,hologram_data.zobj,hologram_data.wlen), output_file, split)
 
     # Risulta essere più efficiente la compressione separando parte reale e immaginaria
     # split = False
@@ -199,19 +221,17 @@ def main():
     # print('Size splitted:',os.path.getsize(os.path.join(os.path.dirname(__file__), 'out', f'{ORIGINAL_CGH_FILENAME}_compressed.fpzip')  ))
     # print('Size unsplitted:',os.path.getsize(os.path.join(os.path.dirname(__file__), 'out', f'{ORIGINAL_CGH_FILENAME}_compressed_unsplitted.fpzip')  ))
 
-    Y = decompress_with_fpzip(output_file,split)
+    decompressed_hologram_data = decompress_with_fpzip(output_file)
 
-    decompressed_X = calculate_X(Y)
-    decompressed_filepath_mat = os.path.join(os.path.dirname(__file__),'..', 'decompressed', f'{ORIGINAL_CGH_FILENAME}_decompressed.mat')
-    savemat(decompressed_filepath_mat, {"Hol": decompressed_X})
+    decompressed_hologram_data.hol = calculate_X(decompressed_hologram_data.hol)
+
+    decompressed_X = decompressed_hologram_data.hol
 
     similarity_manager = paper_similarity.Similarity(paper_similarity.GammaM.bump, paper_similarity.GammaR.cos,
                                              paper_similarity.GammaA.unique)
 
     similarity = similarity_manager.calc_similarity(X,decompressed_X)
     print('Similarity = ',similarity)
-
-    decompressed_hologram_data = Hologram.open_hologram_file(decompressed_filepath_mat)
 
     show_hologram_reconstruction(hologram_data)
     show_hologram_reconstruction(decompressed_hologram_data)
