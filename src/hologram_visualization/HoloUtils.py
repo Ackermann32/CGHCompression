@@ -1,7 +1,7 @@
 #File importato dal progetto precedente HologramCompression di Emanuele Fittipaldi, Paolo Plomitallo, Lucia Gaeta, Sergio Del Sorbo
 import bz2
 import os
-from PIL import Image
+
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.io
