@@ -2,11 +2,12 @@ import numpy as np
 from scipy.io import loadmat
 
 class Hologram:
-    def __init__(self, hol:np.ndarray, pp:float, zobj:float, wlen:float):
+    def __init__(self, hol:np.ndarray, pp:float, zobj:float, wlen:float, data_type:type = np.complex128):
         self.hol =  hol
         self.pp = pp 
         self.zobj = zobj
         self.wlen = wlen
+        self.data_type = data_type
 
     def open_hologram_file(filepath:str):
 
@@ -34,4 +35,4 @@ class Hologram:
             wavelength = 6.33e-07
             print(f"⚠ wavelength non trovata, usando default: {wavelength} nm")
         
-        return Hologram(hologram, pixel_pitch, distance, wavelength)
+        return Hologram(hologram, pixel_pitch, distance, wavelength,hologram.dtype)
