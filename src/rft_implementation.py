@@ -9,93 +9,29 @@ from hologram_visualization.hologram_reconstruction import *
 from hologram_visualization.phase_and_amplitude_reconstruction import *
 import json
 from utils.hologram import Hologram
+from utils.utils import calculate_compression_rate, mobius, divisors
 import pickle
-import utils.utils as utils
 
 ORIGINAL_CGH_FILENAME = 'Hol_2D_dice'
 
-def isPrime(n) :
-
-    if (n < 2) :
-        return False
-    for i in range(2, n + 1) :
-        if (i * i <= n and n % i == 0) :
-            return False
-    return True
-
-def mobius(N) :
-    
-    # Base Case
-    if (N == 1) :
-        return 1
-
-    # For a prime factor i 
-    # check if i^2 is also
-    # a factor.
-    p = 0
-    for i in range(1, N + 1) :
-        if (N % i == 0 and 
-                isPrime(i)) :
-
-            # Check if N is
-            # divisible by i^2
-            if (N % (i * i) == 0) :
-                return 0
-            else :
-
-                # i occurs only once, 
-                # increase p
-                p = p + 1
-
-    # All prime factors are
-    # contained only once
-    # Return 1 if p is even
-    # else -1
-    if(p % 2 != 0) :
-        return -1
-    else :
-        return 1
-    
 def ramanujan_sum_for_dimension(dimension):
-    res = 0
+
+    ramanujan_sums= np.zeros((dimension, dimension))
+
     for n in range(0,dimension):
         for q in range(1,dimension+1):
             gcd = math.gcd(n,q)
-            for d in range(1, gcd+1):
-                if (gcd % d == 0):
-                    res += d*mobius(q/d)
+            res = 0   
+            for d in divisors(gcd):
+                res += d*mobius(q//d)
+            ramanujan_sums[n,q-1] = res
     
-    return res
+    return ramanujan_sums
     
-
-
-#TODO ottimizzare 
 def calculate_ramanujan_sums(rows_lenght, column_lenght):
 
-    ramanujan_sums_row = np.zeros((rows_lenght, rows_lenght))
-    ramanujan_sums_column = np.zeros((column_lenght,column_lenght))
+    return ramanujan_sum_for_dimension(rows_lenght), ramanujan_sum_for_dimension(column_lenght)
 
-    for n in range (0, rows_lenght):
-        for q in range(1,rows_lenght+1):
-            res = 0
-            gcd = math.gcd(n,q)
-            for d in range(1, gcd+1):
-                if (gcd % d == 0):
-                    res += d*mobius(q//d) #Da ricorda che forse si mette // per la divisione senza virgola, esempio 15:2 mi da 7
-
-            ramanujan_sums_row[n,q-1] = res
-
-    for n in range (0, column_lenght):
-        for q in range(1,column_lenght+1):
-            res = 0
-            gcd = math.gcd(n,q)
-            for d in range(1, gcd+1):
-                if (gcd % d == 0):
-                    res += d*mobius(q//d)
-
-            ramanujan_sums_column[n,q-1] = res
-    
-    return ramanujan_sums_row, ramanujan_sums_column
 
 def compress_with_fpzip(hologram:Hologram,output_file,split=True):
 
@@ -141,19 +77,14 @@ def compress_with_fpzip(hologram:Hologram,output_file,split=True):
 
 
 def calculate_Y(X):
-    F_N_output_file = os.path.join(os.path.dirname(__file__),'..','ramanujan_data', 'F_N.npy')
-    F_M_output_file = os.path.join(os.path.dirname(__file__),'..','ramanujan_data', 'F_M.npy')
-    if(os.path.exists(F_N_output_file) and os.path.exists(F_M_output_file)):
-        F_N,F_M = load_ramanujan_sums()
-    else:   
-        F_N,F_M = calculate_ramanujan_sums(1080,1920)
-        save_ramanujan_sums(F_N,F_M,F_N_output_file,F_M_output_file)
+
+    F_N,F_M = load_ramanujan_sums(X.shape[0],X.shape[1])
 
     type = np.float64
     if (X.dtype == np.complex64):
         type= np.float32
-    F_N_inv = np.linalg.pinv(F_N).astype(type) #/!\/!\ per ottenere la massima precisione possibile
-    F_M_inv = np.linalg.pinv(F_M).astype(type)
+    F_N_inv = np.linalg.inv(F_N).astype(type) #/!\/!\ necessario per ottenere la massima precisione possibile
+    F_M_inv = np.linalg.inv(F_M).astype(type)
 
     X128 = np.ascontiguousarray(X.astype(np.complex128))
     Y128 = F_N_inv @ X128 @ F_M_inv.T
@@ -169,11 +100,16 @@ def save_ramanujan_sums(F_N, F_M, F_N_output_file, F_M_output_file):
     with open(F_M_output_file, 'wb') as f:
         np.save(f,F_M)
 
-def load_ramanujan_sums():
-    F_N_output_file = os.path.join(os.path.dirname(__file__),'..','ramanujan_data', 'F_N.npy')
-    F_M_output_file = os.path.join(os.path.dirname(__file__),'..','ramanujan_data', 'F_M.npy')
-    F_N = np.load(F_N_output_file)
-    F_M = np.load(F_M_output_file)
+def load_ramanujan_sums(rows_number,columns_number):
+
+    F_N_output_file = os.path.join(os.path.dirname(__file__),'..','ramanujan_data', f'F_N_{rows_number}.npy')
+    F_M_output_file = os.path.join(os.path.dirname(__file__),'..','ramanujan_data', f'F_M_{columns_number}.npy')
+    if(os.path.exists(F_N_output_file) and os.path.exists(F_M_output_file)):
+        F_N = np.load(F_N_output_file)
+        F_M = np.load(F_M_output_file)
+    else:
+        F_N,F_M = calculate_ramanujan_sums(rows_number,columns_number)
+        save_ramanujan_sums(F_N,F_M,F_N_output_file,F_M_output_file)
 
     return F_N,F_M
 
@@ -201,14 +137,14 @@ def decompress_with_fpzip(output_file):
         else:
             data = f.read()
             float_array = fpzip.decompress(data)
-            float_array = float_array.reshape(1080, 1920, 2)
 
             # ricostruzione dei complessi
             complex_matrix = float_array[...,0] + 1j * float_array[...,1]
             return Hologram(complex_matrix, metadata["pp"], metadata["zobj"], metadata["wlen"],metadata["original_data_type"])
 
 def calculate_X(Y,hologram_type=np.complex128):
-    F_N , F_M = load_ramanujan_sums()
+
+    F_N , F_M = load_ramanujan_sums(Y.shape[0], Y.shape[1])
 
     Y128 = np.ascontiguousarray(Y.astype(np.complex128))#/!\/!\ per ottenere la massima precisione possibile
     X128 = F_N @ Y128 @ F_M.T
@@ -251,7 +187,7 @@ def main():
     path_raw = os.path.join(os.path.dirname(__file__),'hologram.raw')
     with open(path_raw, "wb") as fp:
         pickle.dump(hologram_data, fp)
-    print("compression rate =", utils.calculate_compression_rate(output_file, path_raw))
+    print("compression rate =", calculate_compression_rate(output_file, path_raw))
     os.remove(path_raw)
 
 
