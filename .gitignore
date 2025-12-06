@@ -1,3 +1,6 @@
 progettoCompressioneDati/.venv
 src/dataset/Hol_2D_dice.mat:Zone.Identifier
 *.pyc
+src/rpt_poc.py
+.gitignore
+src/rpt_poc64.py
