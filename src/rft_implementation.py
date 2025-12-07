@@ -16,7 +16,6 @@ from utils.hologram import Hologram
 from utils.utils import calculate_compression_rate, mobius, divisors
 import pickle
 
-ORIGINAL_CGH_FILENAME = 'Hol_3D_venus'
 
 def ramanujan_sum_for_dimension(dimension):
 
@@ -175,56 +174,60 @@ def calculate_X(Y,hologram_type=np.complex128):
 
     return X64
 
-def main():
+def calc_RFT (filename,compressor):
 
-    compressor = Zip()
-
-    filepath_mat = os.path.join(os.path.dirname(__file__),'..', 'dataset', f'{ORIGINAL_CGH_FILENAME}.mat')
-
+    #Recupero dell'ologramma
+    filepath_mat = os.path.join(os.path.dirname(__file__),'..', 'dataset', f'{filename}.mat')
     hologram_data = Hologram.open_hologram_file(filepath_mat)
 
+    #Calcolo della trasformata dell'ologramma
+    Y = calculate_Y(hologram_data.hol)
     X = hologram_data.hol
-    Y = calculate_Y(X)
+
+    #Si specifica che la compressione deve essere splittata, ovvero comprimere parte reale ed immaginaria in modo separato
     split = True
-    output_file = os.path.join(os.path.dirname(__file__),'..', 'out', f'{ORIGINAL_CGH_FILENAME}_compressed{'_unsplitted' if split == False else ''}.{compressor.get_file_extension()}')  
-    compress(Hologram(Y,hologram_data.pp,hologram_data.zobj,hologram_data.wlen,hologram_data.data_type), output_file, split,compressor)
+    output_file = os.path.join(
+    os.path.dirname(__file__),
+    '..',
+    'out',
+    f"{filename}_compressed_rft{'_unsplitted' if not split else ''}.{compressor.get_file_extension()}"
+    )
 
-    # Risulta essere più efficiente la compressione separando parte reale e immaginaria
-    # split = False
-    # output_file = os.path.join(os.path.dirname(__file__), 'out', f'{ORIGINAL_CGH_FILENAME}_compressed{'_unsplitted' if split == False else ''}.fpzip')  
-    # compress_with_fpzip(Y, output_file, split)
-
-    # print('Size splitted:',os.path.getsize(os.path.join(os.path.dirname(__file__), 'out', f'{ORIGINAL_CGH_FILENAME}_compressed.fpzip')  ))
-    # print('Size unsplitted:',os.path.getsize(os.path.join(os.path.dirname(__file__), 'out', f'{ORIGINAL_CGH_FILENAME}_compressed_unsplitted.fpzip')  ))
+    compress(Hologram(Y,hologram_data.pp, hologram_data.zobj, hologram_data.wlen,hologram_data.data_type), output_file, split,compressor)
 
     decompressed_hologram_data = decompress(output_file,compressor)
-    decompressed_hologram_data.hol = calculate_X(decompressed_hologram_data.hol,decompressed_hologram_data.data_type)
-    decompressed_X = decompressed_hologram_data.hol
 
+    #Ricostruzione dell'ologramma decompresso
+    decompressed_X = calculate_X(decompressed_hologram_data.hol,decompressed_hologram_data.data_type)
+    decompressed_hologram_data.hol = decompressed_X
+
+    #Calcolo similarità
     similarity_manager = paper_similarity.Similarity(paper_similarity.GammaM.bump, paper_similarity.GammaR.cos,
                                              paper_similarity.GammaA.unique)
 
     similarity = similarity_manager.calc_similarity(X,decompressed_X)
+    equality = np.array_equal(X, decompressed_X)
+    difference = np.max(np.abs(X - decompressed_X))
+    
     print('Similarity = ',similarity)
+    print("Equality between original and decompressed hologram =", equality)
+    print("Difference between original and decompressed hologram =", difference)
+
 
     #Salvo ologramma in formato .raw per calcolare il tasso di compressione
     path_raw = os.path.join(os.path.dirname(__file__),'hologram.raw')
     with open(path_raw, "wb") as fp:
         pickle.dump(hologram_data, fp)
-    print("compression rate =", calculate_compression_rate(output_file, path_raw))
+        compression_rate = calculate_compression_rate(output_file, path_raw)
+    print("compression rate =", compression_rate)
+    
     os.remove(path_raw)
 
+    #show_hologram_reconstruction(hologram_data)
+    #show_hologram_reconstruction(decompressed_hologram_data)
+    #show_phase_and_amplitude(hologram_data)
+    #show_phase_and_amplitude(decompressed_hologram_data)
 
-    print("Bitwise identical:", np.array_equal(X, decompressed_X))
-    print("Max absolute diff:", np.max(np.abs(X - decompressed_X)))
+    return similarity,equality,difference, compression_rate
 
-
-    show_hologram_reconstruction(hologram_data)
-    show_hologram_reconstruction(decompressed_hologram_data)
-
-    show_phase_and_amplitude(hologram_data)
-    show_phase_and_amplitude(decompressed_hologram_data)
-
-if __name__ == '__main__':
-    main()
     
