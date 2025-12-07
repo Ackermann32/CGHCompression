@@ -1,5 +1,6 @@
 from scipy.io import loadmat
 from scipy.io import savemat
+from scipy.linalg import inv
 import math
 import numpy as np
 import os
@@ -12,8 +13,8 @@ from hologram_visualization.hologram_reconstruction import *
 from hologram_visualization.phase_and_amplitude_reconstruction import *
 import pickle
 from utils.utils import mobius, isPrime, divisors
+from scipy.linalg import qr
 
-ORIGINAL_CGH_FILENAME = 'Hol_3D_venus'
 
 def euler_phi(q): #Restituisce quanti numeri tra 1 e q sono coprimi con q
     count = 0
@@ -72,8 +73,10 @@ def calculate_Y(X):
     P_M = calculate_ramanujan_sums(X.shape[1], typeRep)
 
 
-    F_N_inv = np.linalg.inv(P_N).astype(typeRep)
-    F_M_inv = np.linalg.inv(P_M).astype(typeRep)
+    U, S, Vt = np.linalg.svd(P_N)
+    F_N_inv = np.dot(Vt.T, np.dot(np.diag(1/S), U.T))
+    K, Z, Ft = np.linalg.svd(P_M)
+    F_M_inv = np.dot(Ft.T, np.dot(np.diag(1/Z), K.T))
 
     Y = F_N_inv @ X @ F_M_inv.T 
 
@@ -96,6 +99,7 @@ def compress_with_fpzip(hologram:Hologram,output_file,split=True):
     metadata["zobj"] = float(np.asarray(hologram.zobj).squeeze())
     metadata["wlen"] = float(np.asarray(hologram.wlen).squeeze())
     metadata["isSplitted"] = split
+    metadata["shape"] = hologram.hol.shape
 
     header_bytes = json.dumps(metadata).encode("utf-8")
     header_len = np.int64(len(header_bytes)).tobytes()
@@ -135,6 +139,7 @@ def decompress_with_fpzip(output_file):
         header_bytes = f.read(header_len)
         metadata = json.loads(header_bytes.decode("utf-8"))
         split = metadata["isSplitted"]
+        shape = metadata['shape']
 
         if(split):
             len_real = np.frombuffer(f.read(8), dtype=np.int64)[0]
@@ -156,11 +161,12 @@ def decompress_with_fpzip(output_file):
         else:
             data = f.read()
             float_array = fpzip.decompress(data)
-            float_array = float_array.reshape(Y.shape[0], Y.shape[1], 2)
+            float_array = float_array.reshape(shape[0], shape[1], 2)
 
             # ricostruzione dei complessi
             complex_matrix = float_array[...,0] + 1j * float_array[...,1]
             return Hologram(complex_matrix, metadata["pp"], metadata["zobj"], metadata["wlen"])
+
 
 
 
@@ -171,7 +177,13 @@ def decompress_with_fpzip(output_file):
 
 
 
-def main():
+def calc_RPT (filename):
+
+    ORIGINAL_CGH_FILENAME = filename
+
+
+
+
 
     #Recupero dell'ologramma
     filepath_mat = os.path.join(os.path.dirname(__file__),'..', 'dataset', f'{ORIGINAL_CGH_FILENAME}.mat')
@@ -181,7 +193,6 @@ def main():
 
     #Calcolo della trasformata dell'ologramma
     Y = calculate_Y(hologram_data.hol)
-    
     X = hologram_data.hol
 
 
@@ -208,31 +219,33 @@ def main():
                                              paper_similarity.GammaA.unique)
 
     similarity = similarity_manager.calc_similarity(X,decompressed_X)
-
+    equality = np.array_equal(X, decompressed_X)
+    difference = np.max(np.abs(X - decompressed_X))
+    
 
 
 
     print('Similarity = ',similarity)
-    print("Equality between original and decompressed hologram =", np.array_equal(X, decompressed_X))
-    print("Difference between original and decompressed hologram =", np.max(np.abs(X - decompressed_X)))
+    print("Equality between original and decompressed hologram =", equality)
+    print("Difference between original and decompressed hologram =", difference)
 
 
     #Salvo ologramma in formato .raw per calcolare il tasso di compressione
     path_raw = os.path.join(os.path.dirname(__file__),'hologram.raw')
     with open(path_raw, "wb") as fp:
         pickle.dump(hologram_data, fp)
-    print("compression rate =",(1 - utils.calculate_compression_rate(output_file, path_raw))*100)
+        compression_rate = utils.calculate_compression_rate(output_file, path_raw)
+    print("compression rate =", compression_rate)
     
     os.remove(path_raw)
 
-    show_hologram_reconstruction(hologram_data)
-    show_hologram_reconstruction(decompressed_hologram_data)
+    #show_hologram_reconstruction(hologram_data)
+    #show_hologram_reconstruction(decompressed_hologram_data)
 
-    show_phase_and_amplitude(hologram_data)
-    show_phase_and_amplitude(decompressed_hologram_data)
+    #show_phase_and_amplitude(hologram_data)
+    #show_phase_and_amplitude(decompressed_hologram_data)
 
+
+    return similarity,equality,difference, compression_rate
 
  
-if __name__ == '__main__':
-    main()
-    

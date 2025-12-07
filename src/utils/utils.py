@@ -4,7 +4,7 @@ def calculate_compression_rate(compressed_filepath: str, uncompressed_filepath: 
     compressed_len = os.path.getsize(compressed_filepath)
     uncompressed_len = os.path.getsize(uncompressed_filepath)
     ratio = compressed_len / uncompressed_len
-    return ratio
+    return  (1-ratio)*100
 
 def isPrime(n) :
 
