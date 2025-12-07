@@ -3,7 +3,11 @@ from scipy.io import savemat
 import math
 import numpy as np
 import os
-import fpzip
+from compressors.fpzip import Fpzip
+from compressors.gzip import Gzip
+from compressors.bzip2 import Bzip2
+from compressors.zfp import Zfp
+from compressors.zip import Zip
 from utils import paper_similarity
 from hologram_visualization.hologram_reconstruction import *
 from hologram_visualization.phase_and_amplitude_reconstruction import *
@@ -12,7 +16,7 @@ from utils.hologram import Hologram
 from utils.utils import calculate_compression_rate, mobius, divisors
 import pickle
 
-ORIGINAL_CGH_FILENAME = 'Hol_2D_dice'
+ORIGINAL_CGH_FILENAME = 'Hol_3D_venus'
 
 def ramanujan_sum_for_dimension(dimension):
 
@@ -33,7 +37,7 @@ def calculate_ramanujan_sums(rows_lenght, column_lenght):
     return ramanujan_sum_for_dimension(rows_lenght), ramanujan_sum_for_dimension(column_lenght)
 
 
-def compress_with_fpzip(hologram:Hologram,output_file,split=True):
+def compress(hologram:Hologram,output_file,split,compressor):
 
     metadata = {}
     metadata["pp"]   = float(np.asarray(hologram.pp).squeeze()) #Non so perchè non li vede come scalari
@@ -41,6 +45,7 @@ def compress_with_fpzip(hologram:Hologram,output_file,split=True):
     metadata["wlen"] = float(np.asarray(hologram.wlen).squeeze())
     metadata["isSplitted"] = split
     metadata["original_data_type"] = str(hologram.data_type)
+    metadata["shape"] = hologram.hol.shape
 
     header_bytes = json.dumps(metadata).encode("utf-8")
     header_len = np.int64(len(header_bytes)).tobytes()
@@ -58,12 +63,14 @@ def compress_with_fpzip(hologram:Hologram,output_file,split=True):
         if split and np.iscomplexobj(matrix):
             real_data = np.ascontiguousarray(np.real(matrix),type)
             imag_data = np.ascontiguousarray(np.imag(matrix),type)
-            
-            compressed_real = fpzip.compress(real_data)
-            compressed_imag = fpzip.compress(imag_data)
+
+            compressed_real = compressor.compress(real_data)
+            compressed_imag = compressor.compress(imag_data)
+
             #Salvo la lunghezza 
             f.write(np.int64(len(compressed_real)).tobytes())
             f.write(np.int64(len(compressed_imag)).tobytes())
+
             f.write(compressed_real)
             f.write(compressed_imag)    
         
@@ -72,7 +79,7 @@ def compress_with_fpzip(hologram:Hologram,output_file,split=True):
             float_view = matrix.view(type)
             float_view = np.ascontiguousarray(float_view)
 
-            compressed = fpzip.compress(float_view)
+            compressed = compressor.compress(float_view)
             f.write(compressed)
 
 
@@ -113,7 +120,7 @@ def load_ramanujan_sums(rows_number,columns_number):
 
     return F_N,F_M
 
-def decompress_with_fpzip(output_file):
+def decompress(output_file,compressor):
     with open(output_file, 'rb') as f:
 
         header_len = np.frombuffer(f.read(8), dtype=np.int64)[0]
@@ -128,16 +135,30 @@ def decompress_with_fpzip(output_file):
             compressed_real = f.read(len_real)
             compressed_imaginary = f.read(len_imag)
 
-            uncompressed_real = fpzip.decompress(compressed_real, order='C').squeeze()
-            uncompressed_imaginary = fpzip.decompress(compressed_imaginary, order='C').squeeze()
+            uncompressed_real = compressor.decompress(compressed_real)
+            uncompressed_imaginary = compressor.decompress(compressed_imaginary)
+
+            if(isinstance(compressor,(Gzip,Bzip2,Zip))):
+                part_type = np.float64
+                if metadata['original_data_type'] == 'complex64':
+                    part_type = np.float32
+                uncompressed_real = np.frombuffer(uncompressed_real,part_type).reshape(metadata["shape"])
+                uncompressed_imaginary = np.frombuffer(uncompressed_imaginary,part_type).reshape(metadata["shape"])
 
             #ricostruisco la matrice complessa
             Y = uncompressed_real + 1j * uncompressed_imaginary
             return Hologram(Y, metadata["pp"], metadata["zobj"], metadata["wlen"],metadata["original_data_type"] )
         else:
             data = f.read()
-            float_array = fpzip.decompress(data)
+            float_array = compressor.decompress(data) 
+        
+            if(isinstance(compressor,(Gzip,Bzip2,Zip))):
+                part_type = np.float64
+                if metadata['original_data_type'] == 'complex64':
+                    part_type = np.float32
+                float_array = np.frombuffer(float_array,part_type)
 
+            float_array = float_array.reshape(metadata["shape"] + [2])# terza dimensione necessaria per rappresentare le due componenti del numero complesso, reale e immaginaria
             # ricostruzione dei complessi
             complex_matrix = float_array[...,0] + 1j * float_array[...,1]
             return Hologram(complex_matrix, metadata["pp"], metadata["zobj"], metadata["wlen"],metadata["original_data_type"])
@@ -155,6 +176,9 @@ def calculate_X(Y,hologram_type=np.complex128):
     return X64
 
 def main():
+
+    compressor = Zip()
+
     filepath_mat = os.path.join(os.path.dirname(__file__),'..', 'dataset', f'{ORIGINAL_CGH_FILENAME}.mat')
 
     hologram_data = Hologram.open_hologram_file(filepath_mat)
@@ -162,8 +186,8 @@ def main():
     X = hologram_data.hol
     Y = calculate_Y(X)
     split = True
-    output_file = os.path.join(os.path.dirname(__file__),'..', 'out', f'{ORIGINAL_CGH_FILENAME}_compressed{'_unsplitted' if split == False else ''}.fpzip')  
-    compress_with_fpzip(Hologram(Y,hologram_data.pp,hologram_data.zobj,hologram_data.wlen,hologram_data.data_type), output_file, split)
+    output_file = os.path.join(os.path.dirname(__file__),'..', 'out', f'{ORIGINAL_CGH_FILENAME}_compressed{'_unsplitted' if split == False else ''}.{compressor.get_file_extension()}')  
+    compress(Hologram(Y,hologram_data.pp,hologram_data.zobj,hologram_data.wlen,hologram_data.data_type), output_file, split,compressor)
 
     # Risulta essere più efficiente la compressione separando parte reale e immaginaria
     # split = False
@@ -173,7 +197,7 @@ def main():
     # print('Size splitted:',os.path.getsize(os.path.join(os.path.dirname(__file__), 'out', f'{ORIGINAL_CGH_FILENAME}_compressed.fpzip')  ))
     # print('Size unsplitted:',os.path.getsize(os.path.join(os.path.dirname(__file__), 'out', f'{ORIGINAL_CGH_FILENAME}_compressed_unsplitted.fpzip')  ))
 
-    decompressed_hologram_data = decompress_with_fpzip(output_file)
+    decompressed_hologram_data = decompress(output_file,compressor)
     decompressed_hologram_data.hol = calculate_X(decompressed_hologram_data.hol,decompressed_hologram_data.data_type)
     decompressed_X = decompressed_hologram_data.hol
 
