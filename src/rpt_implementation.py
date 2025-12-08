@@ -19,6 +19,7 @@ from compressors.gzip import Gzip
 from compressors.bzip2 import Bzip2
 from compressors.zfp import Zfp
 from compressors.zip import Zip
+import time
 
 
 def euler_phi(q): #Restituisce quanti numeri tra 1 e q sono coprimi con q
@@ -161,7 +162,6 @@ def decompress(output_file,compressor):
                 part_type = np.float64
                 if metadata['original_data_type'] == 'complex64':
                     part_type = np.float32
-                print(part_type)
                 uncompressed_real = np.frombuffer(uncompressed_real,part_type).reshape(metadata["shape"])
                 uncompressed_imaginary = np.frombuffer(uncompressed_imaginary,part_type).reshape(metadata["shape"])
 
@@ -199,20 +199,10 @@ def calc_RPT (filename,compressor):
 
     ORIGINAL_CGH_FILENAME = filename
 
-
-
-
-
     #Recupero dell'ologramma
     filepath_mat = os.path.join(os.path.dirname(__file__),'..', 'dataset', f'{ORIGINAL_CGH_FILENAME}.mat')
 
     hologram_data = Hologram.open_hologram_file(filepath_mat)
-
-
-    #Calcolo della trasformata dell'ologramma
-    Y = calculate_Y(hologram_data.hol)
-    X = hologram_data.hol
-
 
     #Si specifica che la compressione deve essere splittata, ovvero comprimere parte reale ed immaginaria in modo separato
     split = True
@@ -221,16 +211,22 @@ def calc_RPT (filename,compressor):
     '..',
     'out',
     f"{ORIGINAL_CGH_FILENAME}_compressed_rpt{'_unsplitted' if not split else ''}.fpzip"
-)
+    )
 
+    start_time_compress = time.perf_counter()
+    #Calcolo della trasformata dell'ologramma
+    Y = calculate_Y(hologram_data.hol)
+    X = hologram_data.hol
     #Compressione utilizzando fpzip
     compress(Hologram(Y,hologram_data.pp, hologram_data.zobj, hologram_data.wlen,hologram_data.data_type), output_file, split,compressor)
+    end_time_compress = time.perf_counter()
 
+    start_time_decompress = time.perf_counter()
     #Decompressione utilizzando fpzip
     decompressed_hologram_data = decompress(output_file,compressor)
-
     #Ricostruzione dell'ologramma decompresso
     decompressed_X = calculate_X(decompressed_hologram_data.hol)
+    end_time_decompress = time.perf_counter()
 
     #Calcolo similarità
     similarity_manager = paper_similarity.Similarity(paper_similarity.GammaM.bump, paper_similarity.GammaR.cos,
@@ -257,13 +253,18 @@ def calc_RPT (filename,compressor):
     
     os.remove(path_raw)
 
+    compress_time = end_time_compress - start_time_compress
+    decompress_time = end_time_decompress - start_time_decompress
+
+    print(f"Compression time: {compress_time} seconds")
+    print(f"Decompression time: {decompress_time} seconds")
+
     #show_hologram_reconstruction(hologram_data)
     #show_hologram_reconstruction(decompressed_hologram_data)
 
     #show_phase_and_amplitude(hologram_data)
     #show_phase_and_amplitude(decompressed_hologram_data)
 
-
-    return similarity,equality,difference, compression_rate
+    return similarity,equality,difference, compression_rate,compress_time,decompress_time
 
  

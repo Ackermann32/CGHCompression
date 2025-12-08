@@ -15,7 +15,7 @@ import json
 from utils.hologram import Hologram
 from utils.utils import calculate_compression_rate, mobius, divisors
 import pickle
-
+import time
 
 def ramanujan_sum_for_dimension(dimension):
 
@@ -180,10 +180,6 @@ def calc_RFT (filename,compressor):
     filepath_mat = os.path.join(os.path.dirname(__file__),'..', 'dataset', f'{filename}.mat')
     hologram_data = Hologram.open_hologram_file(filepath_mat)
 
-    #Calcolo della trasformata dell'ologramma
-    Y = calculate_Y(hologram_data.hol)
-    X = hologram_data.hol
-
     #Si specifica che la compressione deve essere splittata, ovvero comprimere parte reale ed immaginaria in modo separato
     split = True
     output_file = os.path.join(
@@ -193,12 +189,21 @@ def calc_RFT (filename,compressor):
     f"{filename}_compressed_rft{'_unsplitted' if not split else ''}.{compressor.get_file_extension()}"
     )
 
+    start_time_compress = time.perf_counter()
+    #Calcolo della trasformata dell'ologramma
+    Y = calculate_Y(hologram_data.hol)
+    X = hologram_data.hol
+
     compress(Hologram(Y,hologram_data.pp, hologram_data.zobj, hologram_data.wlen,hologram_data.data_type), output_file, split,compressor)
 
+    end_time_compress = time.perf_counter()
+
+    start_time_decompress = time.perf_counter()
     decompressed_hologram_data = decompress(output_file,compressor)
 
     #Ricostruzione dell'ologramma decompresso
     decompressed_X = calculate_X(decompressed_hologram_data.hol,decompressed_hologram_data.data_type)
+    end_time_decompress = time.perf_counter()
     decompressed_hologram_data.hol = decompressed_X
 
     #Calcolo similarità
@@ -223,11 +228,16 @@ def calc_RFT (filename,compressor):
     
     os.remove(path_raw)
 
+    compress_time = end_time_compress - start_time_compress
+    decompress_time = end_time_decompress - start_time_decompress
+
+    print(f"Compression time: {compress_time} seconds")
+    print(f"Decompression time: {decompress_time} seconds")
     #show_hologram_reconstruction(hologram_data)
     #show_hologram_reconstruction(decompressed_hologram_data)
     #show_phase_and_amplitude(hologram_data)
     #show_phase_and_amplitude(decompressed_hologram_data)
 
-    return similarity,equality,difference, compression_rate
+    return similarity,equality,difference, compression_rate,compress_time,decompress_time
 
     

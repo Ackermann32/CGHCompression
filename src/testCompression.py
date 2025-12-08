@@ -7,13 +7,13 @@ from compressors.zip import Zip
 from rft_implementation import calc_RFT
 from rpt_implementation import calc_RPT
 
-def CSV_generate(output_file,filename, similarity, equality, difference, algorithm, compression_rate, compressor):
+def CSV_generate(output_file,filename, similarity, equality, difference, algorithm, compression_rate, compressor,compression_time,decompression_time):
 
     
     try:
         with open(output_file, 'a') as f:
   
-            f.write(f"{filename},{algorithm},{similarity},{equality},{difference},{compression_rate},{compressor}\n")
+            f.write(f"{filename},{algorithm},{similarity},{equality},{difference},{compression_rate},{compressor},{compression_time},{decompression_time}\n")
     except Exception as e:
         print(f"Errore nel salvataggio: {e}")
 
@@ -37,7 +37,7 @@ def main():
     try:
         with open(output_file, 'a') as f:
   
-            f.write("FILENAME, ALGORITHM, SIMILARITY, EQUALITY, DIFFERENCE, COMPRESSION RATE, COMPRESSOR\n")
+            f.write("FILENAME, ALGORITHM, SIMILARITY, EQUALITY, DIFFERENCE, COMPRESSION RATE, COMPRESSOR, COMPRESSION TIME, DECOMPRESSION TIME\n")
     except Exception as e:
         print(f"Errore nel salvataggio: {e}")
 
@@ -56,10 +56,10 @@ def main():
             if os.path.isfile(file_path):
                 print("Hologram : ",file_name)
                 for compressor in compressors:
-                    similarity,equality,difference, compression_rate =  calc_RPT(filename=file_name.rstrip('.mat'), compressor=compressor)
-                    CSV_generate(output_file,file_name,similarity,equality,difference,"RPT", compression_rate,type(compressor).__name__)
-                    similarity,equality,difference, compression_rate =  calc_RFT(filename=file_name.rstrip('.mat'), compressor=compressor)
-                    CSV_generate(output_file,file_name,similarity,equality,difference,"RFT", compression_rate,type(compressor).__name__)
+                    similarity,equality,difference, compression_rate,compression_time,decompression_time =  calc_RPT(filename=file_name.rstrip('.mat'), compressor=compressor)
+                    CSV_generate(output_file,file_name,similarity,equality,difference,"RPT", compression_rate,type(compressor).__name__,compression_time,decompression_time)
+                    similarity,equality,difference, compression_rate,compression_time,decompression_time =  calc_RFT(filename=file_name.rstrip('.mat'), compressor=compressor)
+                    CSV_generate(output_file,file_name,similarity,equality,difference,"RFT", compression_rate,type(compressor).__name__,compression_time,decompression_time)
 
             else:
                 print(f"{file_name} non è un file (potrebbe essere una cartella).")
