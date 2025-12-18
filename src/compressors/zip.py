@@ -6,7 +6,7 @@ class Zip(Compressor):
     FILE_NAME_EXTENSION = 'zip'
 
     def compress(self, data):
-        compressed_data = zlib.compress(data)
+        compressed_data = zlib.compress(data, level=zlib.Z_BEST_COMPRESSION)
         return compressed_data
 
     def decompress(self, data):

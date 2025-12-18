@@ -74,7 +74,10 @@ def compress(hologram:Hologram,output_file,split,compressor):
             f.write(compressed_imag)    
         
         else:
-            #Reinterpreto la matrice complessa come una matrice di float64, senza perdere informazione
+            if(type == np.float32):
+                matrix = matrix.astype(np.complex64)
+            else:
+                matrix = matrix.astype(np.complex128)
             float_view = matrix.view(type)
             float_view = np.ascontiguousarray(float_view)
 
@@ -99,6 +102,10 @@ def calculate_Y(X):
     return Y128
 
 def save_ramanujan_sums(F_N, F_M, F_N_output_file, F_M_output_file):
+
+    ramanujan_dir = os.path.join(os.path.dirname(__file__),'..','ramanujan_data')
+    if not os.path.exists(ramanujan_dir):
+        os.makedirs(ramanujan_dir)
 
     with open(F_N_output_file, 'wb') as f:
         np.save(f,F_N)
@@ -174,14 +181,13 @@ def calculate_X(Y,hologram_type=np.complex128):
 
     return X64
 
-def calc_RFT (filename,compressor):
+def calc_RFT (filename,compressor,split = True):
 
     #Recupero dell'ologramma
     filepath_mat = os.path.join(os.path.dirname(__file__),'..', 'dataset', f'{filename}.mat')
     hologram_data = Hologram.open_hologram_file(filepath_mat)
 
     #Si specifica che la compressione deve essere splittata, ovvero comprimere parte reale ed immaginaria in modo separato
-    split = True
     output_file = os.path.join(
     os.path.dirname(__file__),
     '..',

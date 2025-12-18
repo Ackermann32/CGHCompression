@@ -177,7 +177,7 @@ def decompress(output_file,compressor):
                 part_type = np.float64
                 if metadata['original_data_type'] == 'complex64':
                     part_type = np.float32
-                    float_array = np.frombuffer(float_array,part_type)
+                float_array = np.frombuffer(float_array,part_type)
 
             float_array = float_array.reshape(shape[0], shape[1], 2)
 
@@ -195,7 +195,7 @@ def decompress(output_file,compressor):
 
 
 
-def calc_RPT (filename,compressor):
+def calc_RPT (filename,compressor,split = True):
 
     ORIGINAL_CGH_FILENAME = filename
 
@@ -205,7 +205,6 @@ def calc_RPT (filename,compressor):
     hologram_data = Hologram.open_hologram_file(filepath_mat)
 
     #Si specifica che la compressione deve essere splittata, ovvero comprimere parte reale ed immaginaria in modo separato
-    split = True
     output_file = os.path.join(
     os.path.dirname(__file__),
     '..',
