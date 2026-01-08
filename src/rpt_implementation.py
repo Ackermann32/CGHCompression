@@ -197,6 +197,8 @@ def decompress(output_file,compressor):
 
 def calc_RPT (filename,compressor,split = True):
 
+    print(f"-----Calculating RPT for file: {filename} with compressor: {type(compressor).__name__} and split={split}-----")
+
     ORIGINAL_CGH_FILENAME = filename
 
     #Recupero dell'ologramma

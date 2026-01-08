@@ -92,8 +92,8 @@ def calculate_Y(X):
     type = np.float64
     if (X.dtype == np.complex64):
         type= np.float32
-    F_N_inv = np.linalg.inv(F_N).astype(type) #/!\/!\ necessario per ottenere la massima precisione possibile
-    F_M_inv = np.linalg.inv(F_M).astype(type)
+    F_N_inv = np.linalg.pinv(F_N).astype(type) #/!\/!\ necessario per ottenere la massima precisione possibile
+    F_M_inv = np.linalg.pinv(F_M).astype(type)
 
     X128 = np.ascontiguousarray(X.astype(np.complex128))
     Y128 = F_N_inv @ X128 @ F_M_inv.T
@@ -183,6 +183,7 @@ def calculate_X(Y,hologram_type=np.complex128):
 
 def calc_RFT (filename,compressor,split = True):
 
+    print(f"-----Calculating RFT for file: {filename} with compressor: {type(compressor).__name__} and split={split}-----")
     #Recupero dell'ologramma
     filepath_mat = os.path.join(os.path.dirname(__file__),'..', 'dataset', f'{filename}.mat')
     hologram_data = Hologram.open_hologram_file(filepath_mat)
