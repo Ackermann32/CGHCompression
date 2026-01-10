@@ -124,8 +124,12 @@ def compress(hologram:Hologram,output_file,split,compressor):
             real_data = np.ascontiguousarray(np.real(matrix), dtype=typeRep)
             imag_data = np.ascontiguousarray(np.imag(matrix), dtype=typeRep) 
             
-            compressed_real = compressor.compress(real_data)
-            compressed_imag = compressor.compress(imag_data)
+            if isinstance(compressor, Gzip):
+                compressed_real = compressor.compress(real_data.tobytes(order="C"))
+                compressed_imag = compressor.compress(imag_data.tobytes(order="C"))
+            else:
+                compressed_real = compressor.compress(real_data)
+                compressed_imag = compressor.compress(imag_data)
             #Salvo la lunghezza 
             f.write(np.int64(len(compressed_real)).tobytes())
             f.write(np.int64(len(compressed_imag)).tobytes())
@@ -137,7 +141,10 @@ def compress(hologram:Hologram,output_file,split,compressor):
             float_view = matrix.view(typeRep)
             float_view = np.ascontiguousarray(float_view)
 
-            compressed = compressor.compress(float_view)
+            if isinstance(compressor, Gzip):
+                compressed = compressor.compress(float_view.tobytes(order="C"))
+            else:
+                compressed = compressor.compress(float_view)
             f.write(compressed)      
 
 def decompress(output_file,compressor):
@@ -211,7 +218,7 @@ def calc_RPT (filename,compressor,split = True):
     os.path.dirname(__file__),
     '..',
     'out',
-    f"{ORIGINAL_CGH_FILENAME}_compressed_rpt{'_unsplitted' if not split else ''}.fpzip"
+    f"{ORIGINAL_CGH_FILENAME}_compressed_rpt{'_unsplitted' if not split else ''}.{compressor.get_file_extension()}"
     )
 
     start_time_compress = time.perf_counter()

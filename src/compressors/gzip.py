@@ -3,7 +3,7 @@ from compressors.compressor import Compressor
 
 class Gzip(Compressor):
 
-    FILE_NAME_EXTENSION = 'fpzip'
+    FILE_NAME_EXTENSION = 'gz'
 
     def compress(self, data):
         compressed_data = gzip.compress(data,compresslevel=9)
