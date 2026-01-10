@@ -63,12 +63,8 @@ def compress(hologram:Hologram,output_file,split,compressor):
             real_data = np.ascontiguousarray(np.real(matrix),type)
             imag_data = np.ascontiguousarray(np.imag(matrix),type)
 
-            if isinstance(compressor, Gzip):
-                compressed_real = compressor.compress(real_data.tobytes(order="C"))
-                compressed_imag = compressor.compress(imag_data.tobytes(order="C"))
-            else:
-                compressed_real = compressor.compress(real_data)
-                compressed_imag = compressor.compress(imag_data)
+            compressed_real = compressor.compress(real_data)
+            compressed_imag = compressor.compress(imag_data)
 
             #Salvo la lunghezza 
             f.write(np.int64(len(compressed_real)).tobytes())
@@ -85,10 +81,7 @@ def compress(hologram:Hologram,output_file,split,compressor):
             float_view = matrix.view(type)
             float_view = np.ascontiguousarray(float_view)
 
-            if isinstance(compressor, Gzip):
-                compressed = compressor.compress(float_view.tobytes(order="C"))
-            else:
-                compressed = compressor.compress(float_view)
+            compressed = compressor.compress(float_view)
             f.write(compressed)
 
 

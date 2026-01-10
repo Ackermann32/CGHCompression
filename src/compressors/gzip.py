@@ -6,7 +6,7 @@ class Gzip(Compressor):
     FILE_NAME_EXTENSION = 'gz'
 
     def compress(self, data):
-        compressed_data = gzip.compress(data,compresslevel=9)
+        compressed_data = gzip.compress(data.tobytes(order="C"),compresslevel=9)
         return compressed_data
 
     def decompress(self, data):
