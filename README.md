@@ -14,3 +14,9 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # Run tests:
+cd src
+python3 ./testCompression.py
+
+# Folders
+/dataset folder contains the holograms to be compressed
+/out folder contains the compressed files and the generated report.csv with the results
